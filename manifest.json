@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "dbarke.agents",
-  "name": "My Agents",
+  "name": "Agent pace",
   "version": "1.0.0",
   "author": "Omarchy (David Heinemeier Hansson), Daniel Barke",
   "license": "MIT",
@@ -14,12 +14,13 @@
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "My Agents",
+    "displayName": "Agent pace",
     "description": "One bar icon and one panel: rate-limit meters with pace, today, the last week, and the all-time model breakdown for every subscription.",
     "category": "AI",
     "aliases": [
       "agents",
-      "model-usage"
+      "model-usage",
+      "pace"
     ],
     "allowMultiple": false,
     "defaults": {

@@ -1,4 +1,4 @@
-# omarchy-agents-pace
+# omarchy-agent-pace
 
 Claude Code, Codex and Fireworks usage in the [Omarchy](https://omarchy.org/)
 bar — with the numbers on the bar itself and a projection of when the
@@ -44,7 +44,7 @@ this session, tokens today.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/dbarke/omarchy-agents-pace.git --enable
+omarchy plugin add https://github.com/dbarke/omarchy-agent-pace.git --enable
 ```
 
 It installs as `dbarke.agents` and coexists with the built-in `omarchy.agents`

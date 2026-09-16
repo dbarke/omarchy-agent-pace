@@ -12,9 +12,9 @@ allowance runs dry.
 ## What this fork adds
 
 **The figures are on the bar, not behind a click.** Upstream shows an icon;
-this shows the session and weekly windows as live percentages
-(`󱚣 41%↗ 68%→`). Model-scoped limits like "Fable Weekly" keep out of the bar
-deliberately — three figures in a row is a dashboard, not a status bar.
+this shows the session and weekly windows as live percentages: a robot head
+followed by `41%↗ 68%→`. Model-scoped limits like "Fable Weekly" keep out of
+the bar deliberately — three figures in a row is a dashboard, not a status bar.
 
 **A pace projection.** An allowance refills on a schedule, so a window that is
 40% elapsed has "afforded" 40% of its quota. Comparing what you have actually

@@ -83,6 +83,8 @@ Panel {
       if (!w || !(w.percent >= 0)) continue
       var line = w.title + " " + Math.round(w.percent * 100) + "% · resets in "
         + formatDuration(resetMsFor(w))
+      var target = targetText(w)
+      if (target !== "") line += "\n" + target
       var pace = paceText(w)
       if (pace !== "") line += "\n" + pace
       // Only the session window has a token figure scoped to it; the weekly
@@ -285,10 +287,11 @@ Panel {
 
   // ------------------------------------------------------------------- pace
   //
-  // An allowance refills on a schedule, so a window that is 40% elapsed has
-  // "afforded" 40% of its quota. Comparing what has actually been spent
-  // against that straight line answers the only question worth asking of a
-  // rate limit: at this rate, does it run dry before it resets, and when.
+  // An allowance refills on a schedule, so a window whose target (see
+  // "target" below) stands at 40% has "afforded" 40% of its quota. Comparing
+  // what has actually been spent against that line answers the only question
+  // worth asking of a rate limit: at this rate, does it run dry before it
+  // resets, and when.
 
   function windowStartMs(w) {
     if (!w || w.resetAt === "" || !(w.spanMs > 0)) return NaN
@@ -299,25 +302,30 @@ Panel {
   // Null until the window has run long enough for a rate to mean something.
   // Two minutes into a five-hour window a single prompt extrapolates to a
   // blowout, and an arrow that cries wolf every reset is worse than none.
+  //
+  // The rate is measured against the target's clock (see targetFor), not the
+  // wall clock: a weekly allowance spent only on work days would otherwise be
+  // projected across a weekend nobody works, and the arrow would say "runs
+  // dry" while the colour beside it said "under target".
   function paceFor(w) {
     if (!w || !(w.percent >= 0)) return null
-    var startMs = windowStartMs(w)
-    if (!isFinite(startMs)) return null
+    var target = targetFor(w)
+    if (!isFinite(target) || target < 0.05) return null
 
-    var elapsed = root.nowMs - startMs
-    if (!(elapsed > 0) || elapsed < w.spanMs * 0.05) return null
-
-    var resetMs = startMs + w.spanMs
-    var spentPerMs = w.percent / elapsed
-    var runOutMs = spentPerMs > 0 ? root.nowMs + (1 - w.percent) / spentPerMs : Infinity
+    var resetMs = windowStartMs(w) + w.spanMs
+    // At this rate the allowance is gone when the target clock reaches this.
+    var runOutAt = w.percent > 0 ? target / w.percent : Infinity
+    // Same half-point slack as targetState, so arrow and colour flip together.
+    var short = w.percent - target > 0.005 && runOutAt < 1
+    var runOutMs = short ? wallAtTarget(w, runOutAt) : Infinity
 
     return {
-      // 1.0 is exactly on schedule; above it the line is being outrun.
-      ratio: w.percent / (elapsed / w.spanMs),
+      // 1.0 is exactly on target; above it the target is being outrun.
+      ratio: w.percent / target,
       runOutMs: runOutMs,
       resetMs: resetMs,
-      short: isFinite(runOutMs) && runOutMs < resetMs,
-      marginMs: isFinite(runOutMs) ? resetMs - runOutMs : Infinity
+      short: short,
+      marginMs: short ? resetMs - runOutMs : Infinity
     }
   }
 
@@ -359,6 +367,149 @@ Panel {
     if (!pace.short) return paceArrow(pace) + " Lasts past reset at this rate"
     return paceArrow(pace) + " On track to empty ~" + formatRunOut(pace.runOutMs)
       + " · " + formatDuration(pace.marginMs) + " before reset"
+  }
+
+  // ----------------------------------------------------------------- target
+  //
+  // Where usage "should" be right now if the allowance were spread evenly
+  // over the time it is actually meant for. A session only exists while
+  // working, so its target is the straight line through the five hours. A
+  // weekly (or monthly) allowance is spent on work days, not across the
+  // weekend, so its target only advances Monday to Friday between
+  // workdayStartHour and workdayEndHour — measured from the real window
+  // start, whatever weekday and hour the collector says it resets on.
+
+  readonly property real workdayStartHour: clamp(Number(usage.setting("workdayStartHour", 8)), 0, 23)
+  readonly property real workdayEndHour: clamp(Number(usage.setting("workdayEndHour", 17)), workdayStartHour + 1, 24)
+
+  function workMsBetween(fromMs, toMs) {
+    if (!(toMs > fromMs)) return 0
+    var total = 0
+    var day = new Date(fromMs)
+    day.setHours(0, 0, 0, 0)
+    while (day.getTime() < toMs) {
+      var weekday = day.getDay()
+      if (weekday >= 1 && weekday <= 5) {
+        var midnight = day.getTime()
+        var a = Math.max(midnight + workdayStartHour * 3600000, fromMs)
+        var b = Math.min(midnight + workdayEndHour * 3600000, toMs)
+        if (b > a) total += b - a
+      }
+      // Step by calendar day, not 24h, so a DST switch cannot skip or repeat one.
+      day.setDate(day.getDate() + 1)
+      day.setHours(0, 0, 0, 0)
+    }
+    return total
+  }
+
+  // The wall-clock moment the target reaches fraction f of the window —
+  // the inverse of targetFor, which is how a run-out on the target's clock
+  // becomes a time of day.
+  function wallAtTarget(w, f) {
+    var startMs = windowStartMs(w)
+    var resetMs = startMs + w.spanMs
+    if (w.spanMs <= 24 * 3600000) return startMs + f * w.spanMs
+    var need = f * workMsBetween(startMs, resetMs)
+    var day = new Date(startMs)
+    day.setHours(0, 0, 0, 0)
+    while (day.getTime() < resetMs) {
+      var weekday = day.getDay()
+      if (weekday >= 1 && weekday <= 5) {
+        var midnight = day.getTime()
+        var a = Math.max(midnight + workdayStartHour * 3600000, startMs)
+        var b = Math.min(midnight + workdayEndHour * 3600000, resetMs)
+        if (b > a) {
+          if (need <= b - a) return a + need
+          need -= b - a
+        }
+      }
+      day.setDate(day.getDate() + 1)
+      day.setHours(0, 0, 0, 0)
+    }
+    return resetMs
+  }
+
+  // Fraction of the allowance the window has "earned" by now, or NaN when
+  // the window cannot be placed (no reset time, or the record is stale).
+  function targetFor(w) {
+    var startMs = windowStartMs(w)
+    if (!isFinite(startMs)) return NaN
+    var resetMs = startMs + w.spanMs
+    if (root.nowMs >= resetMs) return NaN
+    if (root.nowMs <= startMs) return 0
+    if (w.spanMs <= 24 * 3600000) return (root.nowMs - startMs) / w.spanMs
+    var budget = workMsBetween(startMs, resetMs)
+    // A window with no work time in it at all has nothing to pace against.
+    if (!(budget > 0)) return 1
+    return workMsBetween(startMs, root.nowMs) / budget
+  }
+
+  // Percentage points over target that still count as "slightly" ahead.
+  // Ten points is half a work day of a weekly allowance, or half an hour of
+  // a five-hour session — ahead, but recoverable by easing off.
+  readonly property real targetYellowPoints: 0.10
+
+  // "green", "yellow", "red", or "" when there is no target to judge by.
+  function targetState(w) {
+    if (!w || !(w.percent >= 0)) return ""
+    if (w.percent >= 0.9) return "red"
+    var target = targetFor(w)
+    if (!isFinite(target)) return ""
+    var over = w.percent - target
+    // Half a point of slack, so a figure that rounds to the target on the
+    // bar never reads as over it.
+    if (over <= 0.005) return "green"
+    if (over <= targetYellowPoints) return "yellow"
+    return "red"
+  }
+
+  function targetColor(w) {
+    var state = targetState(w)
+    if (state === "green") return root.good
+    if (state === "yellow") return root.warn
+    if (state === "red") return root.bad
+    return root.foreground
+  }
+
+  function targetText(w) {
+    var target = targetFor(w)
+    if (!isFinite(target)) return ""
+    var over = Math.round((w.percent - target) * 100)
+    return "Target " + Math.round(target * 100) + "% · "
+      + (over > 0 ? over + " pts ahead" : over < 0 ? (-over) + " pts under" : "on target")
+  }
+
+  // The shell's Color singleton only carries foreground/accent/urgent, but
+  // every Omarchy theme's colors.toml names a green, yellow and red (or the
+  // ANSI color2/3/1 slots), so the bar can say it in the theme's own words.
+  property var themePalette: ({})
+  readonly property color good: themePalette.green || "#9ece6a"
+  readonly property color warn: themePalette.yellow || "#e0af68"
+  readonly property color bad: themePalette.red || root.urgent
+
+  function loadThemePalette(raw) {
+    var found = {}
+    var ansi = { color1: "red", color2: "green", color3: "yellow" }
+    var lines = String(raw || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(/^\s*([A-Za-z0-9_-]+)\s*=\s*["']?(#[0-9A-Fa-f]{6})/)
+      if (!m) continue
+      if (m[1] === "red" || m[1] === "green" || m[1] === "yellow") found[m[1]] = m[2]
+      else if (ansi[m[1]] && !found[ansi[m[1]]]) found["_" + ansi[m[1]]] = m[2]
+    }
+    var names = ["red", "green", "yellow"]
+    for (var j = 0; j < names.length; j++)
+      if (!found[names[j]] && found["_" + names[j]]) found[names[j]] = found["_" + names[j]]
+    themePalette = found
+  }
+
+  // A theme switch replaces the directory underneath, which a file watch
+  // does not survive, so the palette is simply reread on the pace timer.
+  FileView {
+    id: themeColorsFile
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/colors.toml"
+    printErrors: false
+    onLoaded: root.loadThemePalette(text())
   }
 
   // ---------------------------------------------------------------- balance
@@ -538,7 +689,10 @@ Panel {
     interval: root.opened ? 30000 : 60000
     running: true
     repeat: true
-    onTriggered: root.nowMs = Date.now()
+    onTriggered: {
+      root.nowMs = Date.now()
+      themeColorsFile.reload()
+    }
   }
 
   IpcHandler {
@@ -552,7 +706,8 @@ Panel {
     function next(): string { root.selectProvider(root.providerIndex + 1); return "ok" }
   }
 
-  // Glyph plus one figure per window, each coloured by its own pace. A plain
+  // Glyph plus one figure per window, each coloured by how far it runs ahead
+  // of its target (see targetState). A plain
   // label could not do that — WidgetButton paints its text in a single colour
   // — so the button carries custom content and takes its width from the row.
   WidgetButton {
@@ -596,7 +751,7 @@ Panel {
           required property var modelData
           textFormat: Text.PlainText
           text: root.barSegment(modelData)
-          color: root.paceColor(modelData, root.paceFor(modelData))
+          color: root.targetColor(modelData)
           font.family: button.fontFamily
           font.pixelSize: button.fontSize
           renderType: Text.NativeRendering

@@ -39,7 +39,9 @@
       "syncMode": "Off",
       "syncDir": "",
       "syncFileName": "",
-      "syncDeviceId": ""
+      "syncDeviceId": "",
+      "workdayStartHour": 8,
+      "workdayEndHour": 17
     },
     "schema": [
       {
@@ -50,6 +52,25 @@
         "max": 3600,
         "step": 30,
         "defaultValue": 900
+      },
+      {
+        "key": "workdayStartHour",
+        "type": "integer",
+        "label": "Work day starts (hour)",
+        "min": 0,
+        "max": 23,
+        "step": 1,
+        "defaultValue": 8,
+        "description": "The weekly target only advances Monday to Friday between these hours."
+      },
+      {
+        "key": "workdayEndHour",
+        "type": "integer",
+        "label": "Work day ends (hour)",
+        "min": 1,
+        "max": 24,
+        "step": 1,
+        "defaultValue": 17
       },
       {
         "key": "syncMode",

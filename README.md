@@ -16,10 +16,23 @@ this shows the session and weekly windows as live percentages: a robot head
 followed by `41%↗ 68%→`. Model-scoped limits like "Fable Weekly" keep out of
 the bar deliberately — three figures in a row is a dashboard, not a status bar.
 
-**A pace projection.** An allowance refills on a schedule, so a window that is
-40% elapsed has "afforded" 40% of its quota. Comparing what you have actually
-spent against that straight line answers the only question worth asking of a
-rate limit:
+**A pace target, in colour.** An allowance refills on a schedule, so each
+window has a target: how much of it you "should" have spent by now if you
+spread it evenly over the time it is meant for. For the five-hour session
+that is a straight line through the window. For the weekly allowance it only
+advances Monday to Friday during work hours (08–17 by default — see
+Settings), measured from the window's real reset time, so evenings and the
+weekend neither earn budget nor count against you.
+
+Each figure on the bar is coloured by how far it runs ahead of its target,
+in the active theme's own green, yellow and red:
+
+- **green** — at or under target
+- **yellow** — up to 10 points ahead (half a work day of the week, or half
+  an hour of a session): ahead, but recoverable by easing off
+- **red** — more than 10 points ahead, or 90% used whatever the pace
+
+The arrow and the projection read off the same target:
 
 ```
 ↗ On track to empty ~14:32 · 2h 10m before reset
@@ -28,8 +41,7 @@ rate limit:
 
 It stays silent for the first stretch of a window — two minutes into five
 hours, a single prompt extrapolates to nonsense — so a blank row means "too
-early to say", not "nothing to worry about". The text grades from foreground
-toward urgent as the margin narrows, mixed from the active theme.
+early to say", not "nothing to worry about".
 
 **Session token spend that matches the window.** Upstream's collector buckets
 transcript usage by calendar day, which cannot answer "what has this session
@@ -58,7 +70,8 @@ It installs as `dbarke.agents` and coexists with the built-in `omarchy.agents`
 
 ## Settings
 
-Unchanged from upstream: refresh interval, per-agent enable switches for
+`workdayStartHour` / `workdayEndHour` set the hours the weekly target
+advances on work days. Otherwise unchanged from upstream: refresh interval, per-agent enable switches for
 Claude / Codex / Fireworks, and the optional cross-device synced aggregation
 (`syncMode`, `syncDir`, `syncFileName`, `syncDeviceId`).
 
@@ -71,8 +84,8 @@ the Omarchy project:
 - **Upstream:** [`shell/plugins/agents`](https://github.com/basecamp/omarchy)
   in basecamp/omarchy, MIT
 - **Unmodified from upstream:** `Agent.qml`, `Main.qml`, `assets/*.svg`
-- **Modified:** `Panel.qml` (upstream's, plus the bar readout, pace projection
-  and session-token helper described above), `manifest.json`
+- **Modified:** `Panel.qml` (upstream's, plus the bar readout, pace target
+  and projection, and session-token helper described above), `manifest.json`
 
 The bundled Anthropic, OpenAI and Fireworks marks are the respective
 trademarks of their owners, carried over from upstream and used to identify

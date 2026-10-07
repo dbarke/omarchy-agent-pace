@@ -346,10 +346,7 @@ Panel {
   // the further the text travels from foreground toward urgent. A window
   // already past 90% is urgent outright — pace stops being the story.
   function paceColor(w, pace) {
-    if (w && w.percent >= 0.9) return root.urgent
-    if (!w || !pace || !pace.short || !(w.spanMs > 0)) return root.foreground
-    var severity = clamp(pace.marginMs / w.spanMs, 0, 1)
-    return Qt.tint(root.foreground, alpha(root.urgent, 0.35 + 0.65 * severity))
+    return targetColor(w)
   }
 
   // Within the day the clock alone is unambiguous; past midnight it needs
@@ -444,23 +441,31 @@ Panel {
     return workMsBetween(startMs, root.nowMs) / budget
   }
 
-  // Percentage points over target that still count as "slightly" ahead.
-  // Ten points is half a work day of a weekly allowance, or half an hour of
-  // a five-hour session — ahead, but recoverable by easing off.
-  readonly property real targetYellowPoints: 0.10
+  // Where yellow turns red, as spend over target in percent: 125 means a
+  // quarter faster than the allowance refills, so it is gone with a fifth of
+  // the window still to go. A ratio means the same thing late in a window as
+  // early, which a fixed number of points does not.
+  readonly property real paceRedPercent: clamp(Number(usage.setting("paceRedPercent", 125)) || 125, 101, 400)
+  // ...but a bare ratio is jumpy at the start of a window: one prompt, 3%
+  // spent against a 2% target, is 150%. Red also needs this many points over,
+  // and a target the arrow would already trust.
+  readonly property real paceRedMinPoints: clamp(Number(usage.setting("paceRedMinPoints", 5)), 0, 50) / 100
 
   // "green", "yellow", "red", or "" when there is no target to judge by.
+  // Green at or under target; yellow over it; red once the ratio crosses
+  // paceRedPercent. Being nearly empty just before a reset is on target, so
+  // there is no "90% used" override here.
   function targetState(w) {
     if (!w || !(w.percent >= 0)) return ""
-    if (w.percent >= 0.9) return "red"
     var target = targetFor(w)
     if (!isFinite(target)) return ""
     var over = w.percent - target
     // Half a point of slack, so a figure that rounds to the target on the
     // bar never reads as over it.
     if (over <= 0.005) return "green"
-    if (over <= targetYellowPoints) return "yellow"
-    return "red"
+    if (target >= 0.05 && over >= paceRedMinPoints
+        && w.percent / target >= paceRedPercent / 100) return "red"
+    return "yellow"
   }
 
   function targetColor(w) {
@@ -475,8 +480,12 @@ Panel {
     var target = targetFor(w)
     if (!isFinite(target)) return ""
     var over = Math.round((w.percent - target) * 100)
-    return "Target " + Math.round(target * 100) + "% · "
+    var line = "Target " + Math.round(target * 100) + "% · "
       + (over > 0 ? over + " pts ahead" : over < 0 ? (-over) + " pts under" : "on target")
+    // The ratio the red threshold is judged on, so the tooltip shows the
+    // same number the setting is written in.
+    if (over > 0 && target >= 0.05) line += " (" + Math.round(w.percent / target * 100) + "% of target)"
+    return line
   }
 
   // The shell's Color singleton only carries foreground/accent/urgent, but

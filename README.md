@@ -28,9 +28,17 @@ Each figure on the bar is coloured by how far it runs ahead of its target,
 in the active theme's own green, yellow and red:
 
 - **green** — at or under target
-- **yellow** — up to 10 points ahead (half a work day of the week, or half
-  an hour of a session): ahead, but recoverable by easing off
-- **red** — more than 10 points ahead, or 90% used whatever the pace
+- **yellow** — over target but under 125% of it: ahead, recoverable by
+  easing off
+- **red** — 125% of target or more, so at this rate the allowance is gone
+  with a fifth of the window still to go. Early in a window red also needs
+  at least 5 points over target, so one prompt against a tiny target does
+  not flash red at 150%.
+
+The red cut is a ratio rather than a number of points so it means the same
+thing late in a window as early. Both numbers are settings
+(`paceRedPercent`, `paceRedMinPoints`). There is no "90% used" override:
+being nearly empty just before a reset is on target.
 
 The arrow and the projection read off the same target:
 
@@ -71,7 +79,8 @@ It installs as `dbarke.agents` and coexists with the built-in `omarchy.agents`
 ## Settings
 
 `workdayStartHour` / `workdayEndHour` set the hours the weekly target
-advances on work days. Otherwise unchanged from upstream: refresh interval, per-agent enable switches for
+advances on work days. `paceRedPercent` / `paceRedMinPoints` set where yellow
+turns red (see above). Otherwise unchanged from upstream: refresh interval, per-agent enable switches for
 Claude / Codex / Fireworks, and the optional cross-device synced aggregation
 (`syncMode`, `syncDir`, `syncFileName`, `syncDeviceId`).
 

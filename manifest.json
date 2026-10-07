@@ -41,7 +41,9 @@
       "syncFileName": "",
       "syncDeviceId": "",
       "workdayStartHour": 8,
-      "workdayEndHour": 17
+      "workdayEndHour": 17,
+      "paceRedPercent": 125,
+      "paceRedMinPoints": 5
     },
     "schema": [
       {
@@ -71,6 +73,26 @@
         "max": 24,
         "step": 1,
         "defaultValue": 17
+      },
+      {
+        "key": "paceRedPercent",
+        "type": "integer",
+        "label": "Red at this pace (% of target)",
+        "min": 105,
+        "max": 400,
+        "step": 5,
+        "defaultValue": 125,
+        "description": "Spend over target. 100 is exactly on target and anything over it is yellow; at 125 the allowance runs dry with a fifth of the window still to go."
+      },
+      {
+        "key": "paceRedMinPoints",
+        "type": "integer",
+        "label": "Red needs at least this many points over",
+        "min": 0,
+        "max": 50,
+        "step": 1,
+        "defaultValue": 5,
+        "description": "Keeps one early prompt from flashing red when the target is still tiny."
       },
       {
         "key": "syncMode",
